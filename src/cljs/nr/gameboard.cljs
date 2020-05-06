@@ -1499,7 +1499,7 @@
        [cond-button
         (str "Rez " (:title current-ice))
         (not (rezzed? current-ice))
-        #(send-command "rez" {:card current-ice :press-no-action true})])
+        #(send-command "rez" {:card current-ice :press-continue true})])
 
      (= "encounter-ice" (:phase @run))
      (let [current-ice (get-current-ice)]
@@ -1511,10 +1511,9 @@
 
      (and (not (:next-phase @run))
           (zero? (:position @run)))
-     [cond-button
+     [checkbox-button
       "Action before access"
-      (and (not= "initiation" (:phase @run))
-           (not (:no-action @run)))
+      (:corp-phase-43 @run)
       #(send-command "corp-phase-43")])
 
    [cond-button
@@ -1525,7 +1524,7 @@
     (and (not= "initiation" (:phase @run))
          (not= "pass-ice" (:phase @run))
          (not= "corp" (:no-action @run)))
-    #(send-command "no-action")]
+    #(send-command "continue")]
 
    (when (not= "approach-server" (:phase @run))
      [checkbox-button
@@ -1602,6 +1601,42 @@
     [corp-run-div run]
     [runner-run-div run]))
 
+(defn trace-div
+  [prompt]
+  [:div
+   (when-let [base (:base prompt)]
+     ;; This is the initial trace prompt
+     (if (nil? (:strength prompt))
+       (if (= "corp" (:player prompt))
+         ;; This is a trace prompt for the corp, show runner link + credits
+         [:div.info "Runner: " (:link prompt) [:span {:class "anr-icon link"}]
+          " + " (:runner-credits prompt) [:span {:class "anr-icon credit"}]]
+         ;; Trace in which the runner pays first, showing base trace strength and corp credits
+         [:div.info "Trace: " (when (:bonus prompt) (+ base (:bonus prompt)) base)
+          " + " (:corp-credits prompt) [:span {:class "anr-icon credit"}]])
+       ;; This is a trace prompt for the responder to the trace, show strength
+       (if (= "corp" (:player prompt))
+         [:div.info "vs Trace: " (:strength prompt)]
+         [:div.info "vs Runner: " (:strength prompt) [:span {:class "anr-icon link"}]])))
+   [:div.credit-select
+    ;; Inform user of base trace / link and any bonuses
+    (when-let [base (:base prompt)]
+      (if (nil? (:strength prompt))
+        (if (= "corp" (:player prompt))
+          (let [strength (when (:bonus prompt) (+ base (:bonus prompt)) base)]
+            [:span (str strength " + ")])
+          [:span (:link prompt) " " [:span {:class "anr-icon link"}] (str " + " )])
+        (if (= "corp" (:player prompt))
+          [:span (:link prompt) " " [:span {:class "anr-icon link"}] (str " + " )]
+          (let [strength (when (:bonus prompt) (+ base (:bonus prompt)) base)]
+            [:span (str strength " + ")]))))
+    [:select#credit
+     (doall (for [i (range (inc (:choices prompt)))]
+              [:option {:value i :key i} i]))] " credits"]
+   [:button {:on-click #(send-command "choice"
+                                      {:choice (-> "#credit" js/$ .val str->int)})}
+    "OK"]])
+
 (defn button-pane [{:keys [side active-player run end-turn runner-phase-12 corp-phase-12 corp runner me opponent] :as cursor}]
   (let [s (r/atom {})
         autocomp (r/track (fn [] (get-in @game-state [side :prompt 0 :choices :autocomplete])))]
@@ -1650,39 +1685,7 @@
                 "OK"]])
             ;; trace prompts require their own logic
             (= (:prompt-type prompt) "trace")
-            [:div
-             (when-let [base (:base prompt)]
-               ;; This is the initial trace prompt
-               (if (nil? (:strength prompt))
-                 (if (= "corp" (:player prompt))
-                   ;; This is a trace prompt for the corp, show runner link + credits
-                   [:div.info "Runner: " (:link prompt) [:span {:class "anr-icon link"}]
-                    " + " (:runner-credits prompt) [:span {:class "anr-icon credit"}]]
-                   ;; Trace in which the runner pays first, showing base trace strength and corp credits
-                   [:div.info "Trace: " (when (:bonus prompt) (+ base (:bonus prompt)) base)
-                    " + " (:corp-credits prompt) [:span {:class "anr-icon credit"}]])
-                 ;; This is a trace prompt for the responder to the trace, show strength
-                 (if (= "corp" (:player prompt))
-                   [:div.info "vs Trace: " (:strength prompt)]
-                   [:div.info "vs Runner: " (:strength prompt) [:span {:class "anr-icon link"}]])))
-             [:div.credit-select
-              ;; Inform user of base trace / link and any bonuses
-              (when-let [base (:base prompt)]
-                (if (nil? (:strength prompt))
-                  (if (= "corp" (:player prompt))
-                    (let [strength (when (:bonus prompt) (+ base (:bonus prompt)) base)]
-                      [:span (str strength " + ")])
-                    [:span (:link prompt) " " [:span {:class "anr-icon link"}] (str " + " )])
-                  (if (= "corp" (:player prompt))
-                    [:span (:link prompt) " " [:span {:class "anr-icon link"}] (str " + " )]
-                    (let [strength (when (:bonus prompt) (+ base (:bonus prompt)) base)]
-                      [:span (str strength " + ")]))))
-              [:select#credit
-               (doall (for [i (range (inc (:choices prompt)))]
-                        [:option {:value i :key i} i]))] " credits"]
-             [:button {:on-click #(send-command "choice"
-                                                {:choice (-> "#credit" js/$ .val str->int)})}
-              "OK"]]
+            [trace-div prompt]
 
             ;; choice of number of credits
             (= (:choices prompt) "credit")

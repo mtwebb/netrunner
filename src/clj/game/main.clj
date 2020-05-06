@@ -2,8 +2,10 @@
   (:require [cheshire.core :refer [parse-string generate-string]]
             [cheshire.generate :refer [add-encoder encode-str]]
             [game.core :refer [card-is-public?] :as core]
+            [game.core.eid :as eid]
             [game.core.toasts :refer [toast]]
             [game.core.card :refer [private-card get-card]]
+            [game.utils :refer [dissoc-in]]
             [differ.core :as differ]))
 
 (add-encoder java.lang.Object encode-str)
@@ -36,7 +38,6 @@
    "keep" core/keep-hand
    "move" core/move-card
    "mulligan" core/mulligan
-   "no-action" core/no-action
    "play" core/play
    "purge" core/do-purge
    "remove-tag" core/remove-tag
@@ -52,7 +53,7 @@
    "system-msg" #(core/system-msg %1 %2 (:msg %3))
    "toast" toast
    "toggle-auto-no-action" core/toggle-auto-no-action
-   "trash" #(core/trash %1 %2 (get-card %1 (:card %3)))
+   "trash" #(core/trash %1 %2 (eid/make-eid %1) (get-card %1 (:card %3)) nil)
    "trash-resource" core/trash-resource
    "unbroken-subroutines" core/play-unbroken-subroutines
    "view-deck" core/view-deck})
@@ -61,7 +62,9 @@
   (-> state
     (dissoc :eid :events :turn-events :per-turn :prevent :damage :effect-completed :click-state :turn-state)
     (update-in [:corp :register] dissoc :most-recent-drawn)
-    (update-in [:runner :register] dissoc :most-recent-drawn)))
+    (update-in [:runner :register] dissoc :most-recent-drawn)
+    (dissoc-in [:run :current-ice])
+    (dissoc-in [:run :events])))
 
 (defn not-spectator?
   "Returns true if the specified user in the specified state is not a spectator"

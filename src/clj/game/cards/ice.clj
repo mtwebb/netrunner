@@ -1286,6 +1286,9 @@
                                     {:front true})
                               (swap! state assoc-in [:run :position] 1)
                               (set-next-phase state :encounter-ice)
+                              (set-current-ice state)
+                              (update-all-ice state side)
+                              (update-all-icebreakers state side)
                               (effect-completed state side eid)
                               (start-next-phase state side nil)))}}}]
    :subroutines [{:label "End the run unless the Runner suffers 2 net damage"
@@ -1841,8 +1844,8 @@
                                         (hardware? %))}
                   :effect (req (wait-for (trash state side target {:cause :subroutine})
                                          (when current-ice
-                                           (no-action state side nil)
-                                           (continue state side nil))
+                                           (continue state :corp nil)
+                                           (continue state :runner nil))
                                          (trash state side eid card {:cause :subroutine})))}]})
 
 (define-card "Lancelot"
@@ -2043,8 +2046,8 @@
                                                      (clear-wait-prompt state :corp)
                                                      (wait-for (as-agenda state :runner card -1)
                                                                (when current-ice
-                                                                 (no-action state side nil)
-                                                                 (continue state side nil))
+                                                                 (continue state :corp nil)
+                                                                 (continue state :runner nil))
                                                                (effect-completed state side eid)))))}
                                  card nil))}]})
 
@@ -2588,8 +2591,8 @@
                            (system-msg state :corp "trashes Sadaka")
                            (clear-wait-prompt state :runner)
                            (when current-ice
-                             (no-action state side nil)
-                             (continue state side nil))
+                             (continue state :corp nil)
+                             (continue state :runner nil))
                            (trash state :corp eid card nil)))}]}))
 
 (define-card "Sagittarius"
@@ -2835,7 +2838,7 @@
                   :async true
                   :effect (req (gain-credits state :corp 5)
                                (when current-ice
-                                 (no-action state :corp nil)
+                                 (continue state :corp nil)
                                  (continue state :runner nil))
                                (trash state side eid card {:cause :subroutine}))}]})
 
@@ -3115,8 +3118,8 @@
                                  (do (lose-credits state :runner :all)
                                      (lose state :runner :run-credit :all)
                                      (when current-ice
-                                       (no-action state side nil)
-                                       (continue state side nil))
+                                       (continue state :corp nil)
+                                       (continue state :runner nil))
                                      (trash state side eid card {:cause :subroutine}))
                                  (do (lose-credits state :runner 1)
                                      (effect-completed state side eid))))}]})
@@ -3225,8 +3228,8 @@
                   :async true
                   :effect (req (prevent-jack-out state side)
                                (when current-ice
-                                 (no-action state side nil)
-                                 (continue state side nil))
+                                 (continue state :corp nil)
+                                 (continue state :runner nil))
                                (trash state side eid card {:cause :subroutine}))}]})
 
 (define-card "Winchester"
@@ -3276,12 +3279,12 @@
               (assoc wr :event :card-moved)])})
 
 (define-card "Yagura"
-  {:subroutines [(do-net-damage 1)
-                 {:msg "look at the top card of R&D"
+  {:subroutines [{:msg "look at the top card of R&D"
                   :optional {:prompt (msg "Move " (:title (first (:deck corp))) " to the bottom of R&D?")
                              :yes-ability {:msg "move the top card of R&D to the bottom"
                                            :effect (effect (move (first (:deck corp)) :deck))}
-                             :no-ability {:effect (effect (system-msg :corp (str "does not use Yagura to move the top card of R&D to the bottom")))}}}]})
+                             :no-ability {:effect (effect (system-msg :corp (str "does not use Yagura to move the top card of R&D to the bottom")))}}}
+                 (do-net-damage 1)]})
 
 (define-card "Zed 1.0"
   {:implementation "Restriction on having spent [click] is not implemented"
